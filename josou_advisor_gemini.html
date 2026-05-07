@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>女装アドバイザー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e11;
+    --surface: #1a1820;
+    --surface2: #221f2b;
+    --border: rgba(255,255,255,0.08);
+    --accent: #c084fc;
+    --accent2: #f0abfc;
+    --text: #f1f0f5;
+    --muted: #8b8799;
+    --pink: #f472b6;
+    --teal: #2dd4bf;
+    --success: #4ade80;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* nav */
+  nav { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  nav button { flex: 1; padding: 14px 8px; background: none; border: none; color: var(--muted); font-family: inherit; font-size: 12px; cursor: pointer; transition: all .2s; display: flex; flex-direction: column; align-items: center; gap: 4px; border-bottom: 2px solid transparent; }
+  nav button svg { width: 20px; height: 20px; }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover:not(.active) { color: var(--text); }
+
+  /* pages */
+  .page { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .page.active { display: flex; }
+
+  /* === CHAT === */
+  #chat-msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  #chat-msgs::-webkit-scrollbar { width: 4px; }
+  #chat-msgs::-webkit-scrollbar-track { background: transparent; }
+  #chat-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .bubble { max-width: 85%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.7; }
+  .bubble.ai { align-self: flex-start; background: var(--surface2); border-bottom-left-radius: 4px; }
+  .bubble.user { align-self: flex-end; background: linear-gradient(135deg, #7c3aed, #a855f7); border-bottom-right-radius: 4px; }
+  .bubble a { color: var(--accent2); }
+  .bubble .yt-card { margin-top: 10px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px 12px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); transition: background .2s; }
+  .bubble .yt-card:hover { background: rgba(255,255,255,0.1); }
+  .bubble .yt-card svg { flex-shrink: 0; color: #ff4444; }
+  .bubble .yt-card .yt-info { font-size: 12px; }
+  .bubble .yt-card .yt-info strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .bubble .product-card { margin-top: 10px; background: rgba(192,132,252,0.08); border: 1px solid rgba(192,132,252,0.2); border-radius: 10px; padding: 10px 12px; }
+  .bubble .product-card .product-name { font-weight: 500; font-size: 13px; color: var(--accent2); }
+  .bubble .product-card .product-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .bubble .product-card .product-price { font-size: 12px; color: var(--teal); margin-top: 4px; }
+  .typing-indicator { display: flex; gap: 4px; padding: 12px 16px; align-self: flex-start; }
+  .typing-indicator span { width: 8px; height: 8px; background: var(--muted); border-radius: 50%; animation: bounce 1.2s infinite; }
+  .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px; }
+  .quick-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .chat-input-area { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .chat-input-area textarea { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: 14px; resize: none; outline: none; transition: border .2s; height: 44px; max-height: 120px; overflow-y: auto; }
+  .chat-input-area textarea:focus { border-color: var(--accent); }
+  .chat-input-area button { width: 44px; height: 44px; background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity .2s; flex-shrink: 0; }
+  .chat-input-area button:hover { opacity: 0.85; }
+  .chat-input-area button svg { width: 18px; height: 18px; color: white; }
+
+  /* === CHECKLIST === */
+  .check-page { overflow-y: auto; padding: 16px; }
+  .check-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .check-header h2 { font-size: 16px; font-weight: 500; }
+  .date-display { font-size: 12px; color: var(--muted); }
+  .progress-ring-wrap { display: flex; flex-direction: column; align-items: center; padding: 16px 0; }
+  .progress-ring-wrap svg { overflow: visible; }
+  .progress-pct { font-size: 28px; font-weight: 700; margin-top: 8px; color: var(--accent); }
+  .progress-label { font-size: 12px; color: var(--muted); }
+  .check-section { margin-bottom: 20px; }
+  .check-section h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .check-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: all .2s; user-select: none; }
+  .check-item:hover { border-color: rgba(192,132,252,0.3); }
+  .check-item.done { opacity: 0.6; }
+  .check-item.done .check-box { background: var(--accent); border-color: var(--accent); }
+  .check-item.done .check-box svg { display: block; }
+  .check-box { width: 22px; height: 22px; border: 1.5px solid var(--border); border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .check-box svg { display: none; width: 14px; height: 14px; color: white; }
+  .check-text { flex: 1; }
+  .check-text strong { display: block; font-size: 14px; font-weight: 400; }
+  .check-text span { font-size: 11px; color: var(--muted); }
+  .streak-badge { font-size: 11px; background: rgba(234,179,8,0.15); color: #fbbf24; padding: 3px 8px; border-radius: 10px; }
+
+  /* === PHOTO === */
+  .photo-page { overflow-y: auto; padding: 16px; }
+  .photo-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .photo-tab { flex: 1; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; color: var(--muted); cursor: pointer; transition: all .2s; }
+  .photo-tab.active { background: rgba(192,132,252,0.15); border-color: var(--accent); color: var(--accent); }
+  .photo-upload-area { border: 1.5px dashed var(--border); border-radius: 16px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; margin-bottom: 16px; }
+  .photo-upload-area:hover { border-color: var(--accent); background: rgba(192,132,252,0.05); }
+  .photo-upload-area svg { width: 36px; height: 36px; color: var(--muted); margin: 0 auto 10px; }
+  .photo-upload-area p { font-size: 13px; color: var(--muted); }
+  .photo-upload-area span { font-size: 11px; color: var(--muted); opacity: 0.6; }
+  #photo-file-input { display: none; }
+  .photo-preview { position: relative; border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+  .photo-preview img { width: 100%; display: block; max-height: 300px; object-fit: cover; }
+  .analyze-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; border-radius: 12px; color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity .2s; margin-bottom: 16px; }
+  .analyze-btn:hover { opacity: 0.9; }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .analysis-result { background: var(--surface2); border-radius: 12px; padding: 16px; font-size: 13px; line-height: 1.8; border: 1px solid rgba(192,132,252,0.2); }
+  .analysis-result h4 { font-size: 14px; color: var(--accent2); margin-bottom: 10px; }
+  .photo-history { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .photo-thumb { border-radius: 10px; overflow: hidden; position: relative; aspect-ratio: 1; cursor: pointer; }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-thumb .photo-date { position: absolute; bottom: 0; left: 0; right: 0; padding: 6px 8px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); font-size: 10px; color: white; }
+
+  /* === PROGRESS === */
+  .progress-page { overflow-y: auto; padding: 16px; }
+  .week-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 20px; }
+  .cal-day { aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; background: var(--surface); border: 1px solid var(--border); gap: 2px; }
+  .cal-day .cal-label { color: var(--muted); }
+  .cal-day .cal-num { font-size: 13px; font-weight: 500; }
+  .cal-day.today { border-color: var(--accent); }
+  .cal-day.done-day { background: rgba(192,132,252,0.15); border-color: rgba(192,132,252,0.3); }
+  .cal-day.done-day .cal-num { color: var(--accent); }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .stat-card .stat-val { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .stat-card .stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat-card .stat-sub { font-size: 11px; color: var(--teal); margin-top: 4px; }
+  .tips-section h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .tip-item { background: var(--surface); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border-left: 3px solid var(--accent); font-size: 13px; line-height: 1.6; }
+  .tip-item strong { color: var(--accent2); }
+
+  /* scrollbar */
+  .check-page::-webkit-scrollbar, .photo-page::-webkit-scrollbar, .progress-page::-webkit-scrollbar { width: 4px; }
+  .check-page::-webkit-scrollbar-track, .photo-page::-webkit-scrollbar-track, .progress-page::-webkit-scrollbar-track { background: transparent; }
+  .check-page::-webkit-scrollbar-thumb, .photo-page::-webkit-scrollbar-thumb, .progress-page::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <button class="active" onclick="showPage('chat', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    AIチャット
+  </button>
+  <button onclick="showPage('check', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    チェック
+  </button>
+  <button onclick="showPage('photo', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    写真記録
+  </button>
+  <button onclick="showPage('progress', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    進捗
+  </button>
+  <button onclick="showPage('settings', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    設定
+  </button>
+</nav>
+
+<!-- CHAT PAGE -->
+<div id="page-chat" class="page active" style="flex-direction:column;">
+  <div id="chat-msgs">
+    <div class="bubble ai">
+      こんにちは！女装＆外見磨きのAIアドバイザーです✨<br><br>
+      スキンケア・メイク・体型・体毛・コーデなど、何でも相談してください。今の状況を教えてくれると具体的な商品やYouTube動画をおすすめします！
+    </div>
+  </div>
+  <div class="quick-btns">
+    <button class="quick-btn" onclick="sendQuick('体毛のケア方法を教えて')">🪒 体毛ケア</button>
+    <button class="quick-btn" onclick="sendQuick('スキンケアの商品を教えて')">🧴 スキンケア商品</button>
+    <button class="quick-btn" onclick="sendQuick('細くなるための運動動画を教えて')">💪 ダイエット動画</button>
+    <button class="quick-btn" onclick="sendQuick('眉毛の整え方を教えて')">✨ 眉毛ケア</button>
+    <button class="quick-btn" onclick="sendQuick('今日やるべきことは何ですか？')">📋 今日のTo-Do</button>
+  </div>
+  <div class="chat-input-area">
+    <textarea id="chat-input" placeholder="なんでも聞いてください..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button onclick="sendChat()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- CHECKLIST PAGE -->
+<div id="page-check" class="page" style="flex-direction:column;">
+  <div class="check-page">
+    <div class="check-header">
+      <h2>今日のルーティン</h2>
+      <span class="date-display" id="today-date"></span>
+    </div>
+    <div class="progress-ring-wrap">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="8"/>
+        <circle id="progress-ring" cx="50" cy="50" r="42" fill="none" stroke="url(#grad)" stroke-width="8"
+          stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" transform="rotate(-90 50 50)"/>
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#7c3aed"/>
+            <stop offset="100%" stop-color="#f472b6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="progress-pct" id="progress-pct">0%</div>
+      <div class="progress-label">完了率</div>
+    </div>
+
+    <div class="check-section">
+      <h3>🌅 朝のケア</h3>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>洗顔</strong><span>やさしく泡立てて30秒</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>化粧水</strong><span>500円玉サイズを手のひらで</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>日焼け止め</strong><span>SPF30以上を顔全体に</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>眉毛チェック</strong><span>乱れていたら整える</span></div>
+      </div>
+    </div>
+
+    <div class="check-section">
+      <h3>💪 ボディケア</h3>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>体毛チェック・処理</strong><span>気になる部位をシェービング or 除毛</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>運動（10分以上）</strong><span>YouTube動画に合わせてOK</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>水分補給 2L</strong><span>肌のうるおいに直結</span></div>
+      </div>
+    </div>
+
+    <div class="check-section">
+      <h3>🌙 夜のケア</h3>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>ダブル洗顔</strong><span>クレンジング → 洗顔フォーム</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>化粧水 + 乳液</strong><span>水分 → 油分でしっかり蓋</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>写真撮影</strong><span>顔 or 体を記録する</span></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>
+        <div class="check-text"><strong>日記・メモ</strong><span>今日の気づきをAIに話す</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO PAGE -->
+<div id="page-photo" class="page" style="flex-direction:column;">
+  <div class="photo-page">
+    <div class="photo-tabs">
+      <button class="photo-tab active" onclick="switchPhotoTab('face', this)">顔・スキン</button>
+      <button class="photo-tab" onclick="switchPhotoTab('body', this)">体型・スタイル</button>
+      <button class="photo-tab" onclick="switchPhotoTab('coord', this)">コーデ</button>
+    </div>
+    <div class="photo-upload-area" onclick="document.getElementById('photo-file-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <p>写真をアップロード</p>
+      <span>タップして選択、またはドラッグ&ドロップ</span>
+    </div>
+    <input type="file" id="photo-file-input" accept="image/*" onchange="handlePhotoUpload(event)">
+    <div id="photo-preview-area" style="display:none;">
+      <div class="photo-preview">
+        <img id="preview-img" src="" alt="プレビュー">
+      </div>
+      <button class="analyze-btn" onclick="analyzePhoto()" id="analyze-btn">✨ AIで分析する</button>
+      <div id="analysis-result" class="analysis-result" style="display:none;"></div>
+    </div>
+    <div id="photo-history-section">
+      <h3 style="font-size:13px; color:var(--muted); margin-bottom:10px;">過去の記録</h3>
+      <div class="photo-history" id="photo-history-grid">
+        <div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--muted); font-size:13px;">写真を追加すると<br>ここに履歴が表示されます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS PAGE -->
+<div id="page-progress" class="page" style="flex-direction:column;">
+  <div class="progress-page">
+    <h2 style="font-size:16px; font-weight:500; margin-bottom:16px;">進捗カレンダー</h2>
+    <div class="week-calendar" id="week-cal"></div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="streak-count">0</div>
+        <div class="stat-label">日連続達成🔥</div>
+        <div class="stat-sub">継続は力なり</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="total-days">0</div>
+        <div class="stat-label">累計ケア日数</div>
+        <div class="stat-sub">今月</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="photo-count">0</div>
+        <div class="stat-label">記録写真枚数</div>
+        <div class="stat-sub">変化を確認しよう</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">A+</div>
+        <div class="stat-label">スキンケア継続率</div>
+        <div class="stat-sub">洗顔・保湿✓</div>
+      </div>
+    </div>
+    <div class="tips-section">
+      <h3>今週のアドバイス</h3>
+      <div class="tip-item"><strong>体毛ケア</strong>：除毛クリームは週1〜2回が目安。敏感な部位は脱毛テープよりカミソリかクリームを。</div>
+      <div class="tip-item"><strong>肌荒れ注意</strong>：除毛後は保湿必須。乳液 or ボディクリームを忘れずに。</div>
+      <div class="tip-item"><strong>眉毛</strong>：1週間に1回、整えるだけで顔の印象が大きく変わります。細くしすぎ注意！</div>
+      <div class="tip-item"><strong>体型</strong>：ウエスト絞りには「ドローイン」がおすすめ。寝ながらでもOK。</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SETTINGS PAGE -->
+<div id="page-settings" class="page" style="flex-direction:column;">
+  <div class="check-page">
+    <div class="check-header">
+      <h2>設定</h2>
+    </div>
+    <div class="check-section">
+      <h3>🔑 Gemini APIキー</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">Google AI Studio で取得したAPIキーを入力してください。ここに入力したキーはこのブラウザにのみ保存されます。</p>
+      <input type="password" id="api-key-input" placeholder="AIzaSy..." style="width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 14px; color:var(--text); font-family:inherit; font-size:14px; outline:none; margin-bottom:10px;">
+      <button onclick="saveApiKey()" style="width:100%; padding:12px; background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; border-radius:12px; color:white; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:8px;">💾 保存する</button>
+      <div id="api-key-status" style="font-size:13px; text-align:center; color:var(--muted);"></div>
+    </div>
+    <div class="check-section" style="margin-top:8px;">
+      <h3>📖 取得方法</h3>
+      <div class="tip-item">1. <a href="https://aistudio.google.com" target="_blank" style="color:var(--accent);">aistudio.google.com</a> を開く</div>
+      <div class="tip-item">2. 「Get API key」→「Create API key」をクリック</div>
+      <div class="tip-item">3. 表示されたキーをコピーして上に貼り付ける</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+
+const SYSTEM_PROMPT = `あなたは女装・外見磨きをサポートするAIアドバイザーです。
+ユーザーは男性で、女性としての見た目・雰囲気を目指しており、スキンケア・体毛ケア・体型改善・メイク・コーディネートについてアドバイスを求めています。
+現在のレベル：洗顔・保湿のみ実施中。体毛が多くて気にしている。
+
+重要な姿勢：
+- 忖度なし・はっきり言う。「女性に見えるか」「男性っぽさが残っているか」を正直に伝える
+- 褒めるだけでなく、改善すべき点をはっきり指摘する
+- 「女性らしく見えない理由」を具体的に言語化する
+- ただし攻撃的にならず、建設的に伝える
+
+回答スタイル：
+- 具体的で正直、改善点を明確に伝えるトーン
+- 商品をすすめる時は「商品名」「なぜ良いか」「価格帯」を含む
+- YouTube動画をすすめる時は必ず以下のJSON形式で含める：
+  [YT:{"title":"動画タイトル","channel":"チャンネル名","url":"https://www.youtube.com/results?search_query=検索キーワード","desc":"一言説明"}]
+- 商品をすすめる時は以下のJSON形式で含める：
+  [PRODUCT:{"name":"商品名","desc":"説明","price":"価格帯","amazon":"https://www.amazon.co.jp/s?k=検索ワード"}]
+- 長すぎず、要点をまとめて300字以内
+- 絵文字を適度に使う
+- 毎回具体的なアクションを1〜2個提示`;
+
+let chatHistory = [];
+let photoHistory = JSON.parse(localStorage.getItem('photoHistory') || '[]');
+let checkData = JSON.parse(localStorage.getItem('checkData') || '{}');
+let photoCount = photoHistory.length;
+
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'check') initCheck();
+  if (name === 'progress') initProgress();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+function autoResize(el) {
+  el.style.height = '44px';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function sendQuick(text) {
+  document.getElementById('chat-input').value = text;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = '44px';
+  addBubble(text, 'user');
+  chatHistory.push({ role: 'user', content: text });
+  const typing = addTyping();
+  try {
+    const geminiMsgs = chatHistory.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: geminiMsgs
+      })
+    });
+    const data = await res.json();
+    typing.remove();
+    const reply = data.candidates[0].content.parts[0].text;
+    chatHistory.push({ role: 'assistant', content: reply });
+    renderAIBubble(reply);
+  } catch(e) {
+    typing.remove();
+    addBubble('ネットワークエラーが発生しました。もう一度お試しください。', 'ai');
+  }
+}
+
+function addBubble(text, type) {
+  const msgs = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = 'bubble ' + type;
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function addTyping() {
+  const msgs = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = 'typing-indicator';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function renderAIBubble(text) {
+  const msgs = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = 'bubble ai';
+  let processed = text;
+  const ytMatches = [...text.matchAll(/\[YT:(\{[^}]+\})\]/g)];
+  const productMatches = [...text.matchAll(/\[PRODUCT:(\{[^}]+\})\]/g)];
+  processed = processed.replace(/\[YT:\{[^}]+\}\]/g, '').replace(/\[PRODUCT:\{[^}]+\}\]/g, '').trim();
+  div.textContent = processed;
+  ytMatches.forEach(m => {
+    try {
+      const d = JSON.parse(m[1]);
+      const card = document.createElement('a');
+      card.className = 'yt-card';
+      card.href = d.url;
+      card.target = '_blank';
+      card.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg><div class="yt-info"><strong>${d.title}</strong>${d.channel} · ${d.desc}</div>`;
+      div.appendChild(card);
+    } catch(e) {}
+  });
+  productMatches.forEach(m => {
+    try {
+      const d = JSON.parse(m[1]);
+      const card = document.createElement('a');
+      card.className = 'product-card';
+      card.href = d.amazon;
+      card.target = '_blank';
+      card.style.display = 'block';
+      card.style.textDecoration = 'none';
+      card.innerHTML = `<div class="product-name">🛍 ${d.name}</div><div class="product-desc">${d.desc}</div><div class="product-price">価格帯：${d.price}</div>`;
+      div.appendChild(card);
+    } catch(e) {}
+  });
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// CHECKLIST
+const todayKey = () => new Date().toISOString().slice(0,10);
+
+function initCheck() {
+  const d = new Date();
+  document.getElementById('today-date').textContent = `${d.getMonth()+1}月${d.getDate()}日`;
+  const key = todayKey();
+  if (!checkData[key]) checkData[key] = [];
+  const items = document.querySelectorAll('.check-item');
+  items.forEach((item, i) => {
+    if (checkData[key].includes(i)) item.classList.add('done');
+    else item.classList.remove('done');
+  });
+  updateProgress();
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('done');
+  const key = todayKey();
+  if (!checkData[key]) checkData[key] = [];
+  const items = Array.from(document.querySelectorAll('.check-item'));
+  const idx = items.indexOf(el);
+  if (el.classList.contains('done')) {
+    if (!checkData[key].includes(idx)) checkData[key].push(idx);
+  } else {
+    checkData[key] = checkData[key].filter(i => i !== idx);
+  }
+  localStorage.setItem('checkData', JSON.stringify(checkData));
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.check-item').length;
+  const done = document.querySelectorAll('.check-item.done').length;
+  const pct = Math.round(done / total * 100);
+  document.getElementById('progress-pct').textContent = pct + '%';
+  const circumference = 264;
+  const offset = circumference - (pct / 100) * circumference;
+  document.getElementById('progress-ring').style.strokeDashoffset = offset;
+}
+
+// PHOTO
+let currentPhotoTab = 'face';
+
+function switchPhotoTab(tab, btn) {
+  currentPhotoTab = tab;
+  document.querySelectorAll('.photo-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updatePhotoHistory();
+}
+
+function handlePhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('photo-preview-area').style.display = 'block';
+    document.getElementById('analysis-result').style.display = 'none';
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('analyze-btn').textContent = '✨ AIで分析する';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzePhoto() {
+  const img = document.getElementById('preview-img').src;
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = '分析中...';
+  const tabLabels = { face: '顔・スキン', body: '体型・スタイル', coord: 'コーデ' };
+  const prompts = {
+    face: `この顔写真を見て、「女性に見えるか」という観点から正直に評価してください：
+1. 今の状態で女性に見えるか、男性っぽさが残っているか率直に判定
+2. 男性っぽさが出ている具体的なパーツ・理由
+3. 女性らしく見せるための具体的な改善アドバイス2〜3点
+忖度なしに正直に、ただし建設的に伝えてください。`,
+    body: `この体型・スタイルの写真を見て、「女性らしい体型に見えるか」という観点から正直に評価してください：
+1. 今の体型で女性らしく見えるか率直に判定
+2. 男性っぽさが出ている具体的な部位・理由
+3. 女性らしい体型に近づくための具体的な改善アドバイス2〜3点
+忖度なしに正直に、ただし建設的に伝えてください。`,
+    coord: `このコーデ写真を見て、「女性らしく見えるか」という観点から正直に評価してください：
+1. このコーデで女性らしく見えるか率直に判定
+2. 男性っぽさが出ているポイント・理由
+3. 女性らしく見せるための具体的なコーデ改善アドバイス2〜3点
+忖度なしに正直に、ただし建設的に伝えてください。`
+  };
+  try {
+    const base64 = img.split(',')[1];
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+            { text: prompts[currentPhotoTab] }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const result = document.getElementById('analysis-result');
+    result.style.display = 'block';
+    result.innerHTML = `<h4>✨ AI分析結果（${tabLabels[currentPhotoTab]}）</h4>${data.candidates[0].content.parts[0].text.replace(/\n/g,'<br>')}`;
+    btn.textContent = '✅ 分析完了';
+    // save to history
+    const entry = { tab: currentPhotoTab, src: img, date: new Date().toLocaleDateString('ja-JP'), analysis: data.candidates[0].content.parts[0].text };
+    photoHistory.unshift(entry);
+    photoHistory = photoHistory.slice(0, 20);
+    try { localStorage.setItem('photoHistory', JSON.stringify(photoHistory)); } catch(e) {}
+    photoCount = photoHistory.length;
+    updatePhotoHistory();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '✨ AIで分析する';
+    alert('エラーが発生しました。もう一度お試しください。');
+  }
+}
+
+function updatePhotoHistory() {
+  const grid = document.getElementById('photo-history-grid');
+  const filtered = photoHistory.filter(p => p.tab === currentPhotoTab);
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--muted); font-size:13px;">写真を追加すると<br>ここに履歴が表示されます</div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(p => `
+    <div class="photo-thumb">
+      <img src="${p.src}" alt="記録">
+      <div class="photo-date">${p.date}</div>
+    </div>
+  `).join('');
+}
+
+// PROGRESS
+function initProgress() {
+  const today = new Date();
+  const cal = document.getElementById('week-cal');
+  cal.innerHTML = '';
+  const days = ['日','月','火','水','木','金','土'];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    const isDone = checkData[key] && checkData[key].length >= 5;
+    const isToday = i === 0;
+    const div = document.createElement('div');
+    div.className = 'cal-day' + (isDone ? ' done-day' : '') + (isToday ? ' today' : '');
+    div.innerHTML = `<span class="cal-label">${days[d.getDay()]}</span><span class="cal-num">${d.getDate()}</span>`;
+    if (isDone) div.innerHTML += '<span style="font-size:9px;color:var(--accent)">✓</span>';
+    cal.appendChild(div);
+  }
+  // streak
+  let streak = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    if (checkData[key] && checkData[key].length >= 5) streak++;
+    else if (i > 0) break;
+  }
+  document.getElementById('streak-count').textContent = streak;
+  const totalDays = Object.values(checkData).filter(v => v.length >= 5).length;
+  document.getElementById('total-days').textContent = totalDays;
+  document.getElementById('photo-count').textContent = photoCount;
+}
+
+// INIT
+updatePhotoHistory();
+
+// API Key
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) {
+    document.getElementById('api-key-status').textContent = 'キーを入力してください';
+    return;
+  }
+  localStorage.setItem('gemini_api_key', key);
+  document.getElementById('api-key-status').textContent = '✅ 保存しました！';
+  document.getElementById('api-key-input').value = '';
+  setTimeout(() => { document.getElementById('api-key-status').textContent = ''; }, 3000);
+}
+
+// Show key status on load
+window.addEventListener('load', () => {
+  const key = localStorage.getItem('gemini_api_key');
+  if (!key) {
+    // Auto show settings if no key
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-settings').classList.add('active');
+    document.querySelector('nav button:last-child').classList.add('active');
+  }
+});
+</script>
+</body>
+</html>
