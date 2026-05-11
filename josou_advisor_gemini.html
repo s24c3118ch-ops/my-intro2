@@ -356,29 +356,20 @@
   </div>
 </div>
 
+
 <script>
-const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+function getApiKey() {
+  return localStorage.getItem('gemini_api_key') || '';
+}
 
 const SYSTEM_PROMPT = `あなたは女装・外見磨きをサポートするAIアドバイザーです。
 ユーザーは男性で、女性としての見た目・雰囲気を目指しており、スキンケア・体毛ケア・体型改善・メイク・コーディネートについてアドバイスを求めています。
-現在のレベル：洗顔・保湿のみ実施中。体毛が多くて気にしている。
 
-重要な姿勢：
-- 忖度なし・はっきり言う。「女性に見えるか」「男性っぽさが残っているか」を正直に伝える
-- 褒めるだけでなく、改善すべき点をはっきり指摘する
-- 「女性らしく見えない理由」を具体的に言語化する
-- ただし攻撃的にならず、建設的に伝える
-
-回答スタイル：
-- 具体的で正直、改善点を明確に伝えるトーン
-- 商品をすすめる時は「商品名」「なぜ良いか」「価格帯」を含む
-- YouTube動画をすすめる時は必ず以下のJSON形式で含める：
-  [YT:{"title":"動画タイトル","channel":"チャンネル名","url":"https://www.youtube.com/results?search_query=検索キーワード","desc":"一言説明"}]
-- 商品をすすめる時は以下のJSON形式で含める：
-  [PRODUCT:{"name":"商品名","desc":"説明","price":"価格帯","amazon":"https://www.amazon.co.jp/s?k=検索ワード"}]
-- 長すぎず、要点をまとめて300字以内
-- 絵文字を適度に使う
-- 毎回具体的なアクションを1〜2個提示`;
+重要：
+- 正直に改善点を伝える
+- 建設的にアドバイスする
+- 300文字以内
+- 商品や動画を具体的に紹介する`;
 
 let chatHistory = [];
 let photoHistory = JSON.parse(localStorage.getItem('photoHistory') || '[]');
@@ -388,14 +379,19 @@ let photoCount = photoHistory.length;
 function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+
   document.getElementById('page-' + name).classList.add('active');
   btn.classList.add('active');
+
   if (name === 'check') initCheck();
   if (name === 'progress') initProgress();
 }
 
 function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
 }
 
 function autoResize(el) {
@@ -409,292 +405,251 @@ function sendQuick(text) {
 }
 
 async function sendChat() {
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    addBubble('⚠️ 設定ページでGemini APIキーを入力してください', 'ai');
+    return;
+  }
+
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
+
   if (!text) return;
+
   input.value = '';
   input.style.height = '44px';
+
   addBubble(text, 'user');
-  chatHistory.push({ role: 'user', content: text });
+
+  chatHistory.push({
+    role: 'user',
+    content: text
+  });
+
   const typing = addTyping();
+
   try {
     const geminiMsgs = chatHistory.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }]
     }));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: geminiMsgs
-      })
-    });
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
+          contents: geminiMsgs
+        })
+      }
+    );
+
     const data = await res.json();
+
     typing.remove();
+
+    console.log(data);
+
+    if (!data.candidates) {
+      addBubble('⚠️ APIエラーが発生しました', 'ai');
+      return;
+    }
+
     const reply = data.candidates[0].content.parts[0].text;
-    chatHistory.push({ role: 'assistant', content: reply });
+
+    chatHistory.push({
+      role: 'assistant',
+      content: reply
+    });
+
     renderAIBubble(reply);
-  } catch(e) {
+
+  } catch (e) {
+    console.error(e);
+
     typing.remove();
-    addBubble('ネットワークエラーが発生しました。もう一度お試しください。', 'ai');
+
+    addBubble('⚠️ 通信エラーが発生しました', 'ai');
   }
 }
 
 function addBubble(text, type) {
   const msgs = document.getElementById('chat-msgs');
+
   const div = document.createElement('div');
+
   div.className = 'bubble ' + type;
+
   div.textContent = text;
+
   msgs.appendChild(div);
+
   msgs.scrollTop = msgs.scrollHeight;
+
   return div;
 }
 
 function addTyping() {
   const msgs = document.getElementById('chat-msgs');
+
   const div = document.createElement('div');
+
   div.className = 'typing-indicator';
+
   div.innerHTML = '<span></span><span></span><span></span>';
+
   msgs.appendChild(div);
+
   msgs.scrollTop = msgs.scrollHeight;
+
   return div;
 }
 
 function renderAIBubble(text) {
   const msgs = document.getElementById('chat-msgs');
+
   const div = document.createElement('div');
+
   div.className = 'bubble ai';
-  let processed = text;
-  const ytMatches = [...text.matchAll(/\[YT:(\{[^}]+\})\]/g)];
-  const productMatches = [...text.matchAll(/\[PRODUCT:(\{[^}]+\})\]/g)];
-  processed = processed.replace(/\[YT:\{[^}]+\}\]/g, '').replace(/\[PRODUCT:\{[^}]+\}\]/g, '').trim();
-  div.textContent = processed;
-  ytMatches.forEach(m => {
-    try {
-      const d = JSON.parse(m[1]);
-      const card = document.createElement('a');
-      card.className = 'yt-card';
-      card.href = d.url;
-      card.target = '_blank';
-      card.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg><div class="yt-info"><strong>${d.title}</strong>${d.channel} · ${d.desc}</div>`;
-      div.appendChild(card);
-    } catch(e) {}
-  });
-  productMatches.forEach(m => {
-    try {
-      const d = JSON.parse(m[1]);
-      const card = document.createElement('a');
-      card.className = 'product-card';
-      card.href = d.amazon;
-      card.target = '_blank';
-      card.style.display = 'block';
-      card.style.textDecoration = 'none';
-      card.innerHTML = `<div class="product-name">🛍 ${d.name}</div><div class="product-desc">${d.desc}</div><div class="product-price">価格帯：${d.price}</div>`;
-      div.appendChild(card);
-    } catch(e) {}
-  });
+
+  div.textContent = text;
+
   msgs.appendChild(div);
+
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-// CHECKLIST
-const todayKey = () => new Date().toISOString().slice(0,10);
-
-function initCheck() {
-  const d = new Date();
-  document.getElementById('today-date').textContent = `${d.getMonth()+1}月${d.getDate()}日`;
-  const key = todayKey();
-  if (!checkData[key]) checkData[key] = [];
-  const items = document.querySelectorAll('.check-item');
-  items.forEach((item, i) => {
-    if (checkData[key].includes(i)) item.classList.add('done');
-    else item.classList.remove('done');
-  });
-  updateProgress();
-}
-
-function toggleCheck(el) {
-  el.classList.toggle('done');
-  const key = todayKey();
-  if (!checkData[key]) checkData[key] = [];
-  const items = Array.from(document.querySelectorAll('.check-item'));
-  const idx = items.indexOf(el);
-  if (el.classList.contains('done')) {
-    if (!checkData[key].includes(idx)) checkData[key].push(idx);
-  } else {
-    checkData[key] = checkData[key].filter(i => i !== idx);
-  }
-  localStorage.setItem('checkData', JSON.stringify(checkData));
-  updateProgress();
-}
-
-function updateProgress() {
-  const total = document.querySelectorAll('.check-item').length;
-  const done = document.querySelectorAll('.check-item.done').length;
-  const pct = Math.round(done / total * 100);
-  document.getElementById('progress-pct').textContent = pct + '%';
-  const circumference = 264;
-  const offset = circumference - (pct / 100) * circumference;
-  document.getElementById('progress-ring').style.strokeDashoffset = offset;
-}
-
-// PHOTO
-let currentPhotoTab = 'face';
-
-function switchPhotoTab(tab, btn) {
-  currentPhotoTab = tab;
-  document.querySelectorAll('.photo-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  updatePhotoHistory();
-}
-
-function handlePhotoUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    document.getElementById('preview-img').src = ev.target.result;
-    document.getElementById('photo-preview-area').style.display = 'block';
-    document.getElementById('analysis-result').style.display = 'none';
-    document.getElementById('analyze-btn').disabled = false;
-    document.getElementById('analyze-btn').textContent = '✨ AIで分析する';
-  };
-  reader.readAsDataURL(file);
-}
-
 async function analyzePhoto() {
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    alert('Gemini APIキーを設定してください');
+    return;
+  }
+
   const img = document.getElementById('preview-img').src;
+
+  if (!img) {
+    alert('画像を選択してください');
+    return;
+  }
+
   const btn = document.getElementById('analyze-btn');
+
   btn.disabled = true;
   btn.textContent = '分析中...';
-  const tabLabels = { face: '顔・スキン', body: '体型・スタイル', coord: 'コーデ' };
-  const prompts = {
-    face: `この顔写真を見て、「女性に見えるか」という観点から正直に評価してください：
-1. 今の状態で女性に見えるか、男性っぽさが残っているか率直に判定
-2. 男性っぽさが出ている具体的なパーツ・理由
-3. 女性らしく見せるための具体的な改善アドバイス2〜3点
-忖度なしに正直に、ただし建設的に伝えてください。`,
-    body: `この体型・スタイルの写真を見て、「女性らしい体型に見えるか」という観点から正直に評価してください：
-1. 今の体型で女性らしく見えるか率直に判定
-2. 男性っぽさが出ている具体的な部位・理由
-3. 女性らしい体型に近づくための具体的な改善アドバイス2〜3点
-忖度なしに正直に、ただし建設的に伝えてください。`,
-    coord: `このコーデ写真を見て、「女性らしく見えるか」という観点から正直に評価してください：
-1. このコーデで女性らしく見えるか率直に判定
-2. 男性っぽさが出ているポイント・理由
-3. 女性らしく見せるための具体的なコーデ改善アドバイス2〜3点
-忖度なしに正直に、ただし建設的に伝えてください。`
-  };
+
   try {
     const base64 = img.split(',')[1];
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-            { text: prompts[currentPhotoTab] }
-          ]
-        }]
-      })
-    });
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64
+                }
+              },
+              {
+                text: 'この画像について改善点を教えてください'
+              }
+            ]
+          }]
+        })
+      }
+    );
+
     const data = await res.json();
-    const result = document.getElementById('analysis-result');
-    result.style.display = 'block';
-    result.innerHTML = `<h4>✨ AI分析結果（${tabLabels[currentPhotoTab]}）</h4>${data.candidates[0].content.parts[0].text.replace(/\n/g,'<br>')}`;
+
+    console.log(data);
+
+    if (!data.candidates) {
+      alert('画像分析に失敗しました');
+      btn.disabled = false;
+      btn.textContent = '✨ AIで分析する';
+      return;
+    }
+
+    const result =
+      data.candidates[0].content.parts[0].text;
+
+    const resultBox =
+      document.getElementById('analysis-result');
+
+    resultBox.style.display = 'block';
+
+    resultBox.innerHTML =
+      `<h4>✨ AI分析結果</h4>${result.replace(/\n/g, '<br>')}`;
+
     btn.textContent = '✅ 分析完了';
-    // save to history
-    const entry = { tab: currentPhotoTab, src: img, date: new Date().toLocaleDateString('ja-JP'), analysis: data.candidates[0].content.parts[0].text };
-    photoHistory.unshift(entry);
-    photoHistory = photoHistory.slice(0, 20);
-    try { localStorage.setItem('photoHistory', JSON.stringify(photoHistory)); } catch(e) {}
-    photoCount = photoHistory.length;
-    updatePhotoHistory();
-  } catch(e) {
+
+  } catch (e) {
+    console.error(e);
+
+    alert('エラーが発生しました');
+
     btn.disabled = false;
     btn.textContent = '✨ AIで分析する';
-    alert('エラーが発生しました。もう一度お試しください。');
   }
 }
 
-function updatePhotoHistory() {
-  const grid = document.getElementById('photo-history-grid');
-  const filtered = photoHistory.filter(p => p.tab === currentPhotoTab);
-  if (filtered.length === 0) {
-    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--muted); font-size:13px;">写真を追加すると<br>ここに履歴が表示されます</div>';
-    return;
-  }
-  grid.innerHTML = filtered.map(p => `
-    <div class="photo-thumb">
-      <img src="${p.src}" alt="記録">
-      <div class="photo-date">${p.date}</div>
-    </div>
-  `).join('');
-}
-
-// PROGRESS
-function initProgress() {
-  const today = new Date();
-  const cal = document.getElementById('week-cal');
-  cal.innerHTML = '';
-  const days = ['日','月','火','水','木','金','土'];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0,10);
-    const isDone = checkData[key] && checkData[key].length >= 5;
-    const isToday = i === 0;
-    const div = document.createElement('div');
-    div.className = 'cal-day' + (isDone ? ' done-day' : '') + (isToday ? ' today' : '');
-    div.innerHTML = `<span class="cal-label">${days[d.getDay()]}</span><span class="cal-num">${d.getDate()}</span>`;
-    if (isDone) div.innerHTML += '<span style="font-size:9px;color:var(--accent)">✓</span>';
-    cal.appendChild(div);
-  }
-  // streak
-  let streak = 0;
-  for (let i = 0; i < 30; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0,10);
-    if (checkData[key] && checkData[key].length >= 5) streak++;
-    else if (i > 0) break;
-  }
-  document.getElementById('streak-count').textContent = streak;
-  const totalDays = Object.values(checkData).filter(v => v.length >= 5).length;
-  document.getElementById('total-days').textContent = totalDays;
-  document.getElementById('photo-count').textContent = photoCount;
-}
-
-// INIT
-updatePhotoHistory();
-
-// API Key
 function saveApiKey() {
-  const key = document.getElementById('api-key-input').value.trim();
+  const key =
+    document.getElementById('api-key-input').value.trim();
+
   if (!key) {
-    document.getElementById('api-key-status').textContent = 'キーを入力してください';
+    document.getElementById('api-key-status').textContent =
+      'キーを入力してください';
     return;
   }
+
   localStorage.setItem('gemini_api_key', key);
-  document.getElementById('api-key-status').textContent = '✅ 保存しました！';
+
+  document.getElementById('api-key-status').textContent =
+    '✅ 保存しました';
+
   document.getElementById('api-key-input').value = '';
-  setTimeout(() => { document.getElementById('api-key-status').textContent = ''; }, 3000);
+
+  setTimeout(() => {
+    document.getElementById('api-key-status').textContent = '';
+  }, 3000);
 }
 
-// Show key status on load
 window.addEventListener('load', () => {
-  const key = localStorage.getItem('gemini_api_key');
+  const key = getApiKey();
+
   if (!key) {
-    // Auto show settings if no key
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById('page-settings').classList.add('active');
-    document.querySelector('nav button:last-child').classList.add('active');
+    document.querySelectorAll('.page')
+      .forEach(p => p.classList.remove('active'));
+
+    document.querySelectorAll('nav button')
+      .forEach(b => b.classList.remove('active'));
+
+    document.getElementById('page-settings')
+      .classList.add('active');
+
+    document.querySelector('nav button:last-child')
+      .classList.add('active');
   }
 });
 </script>
+
+
 </body>
 </html>
