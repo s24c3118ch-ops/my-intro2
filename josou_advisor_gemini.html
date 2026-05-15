@@ -274,19 +274,31 @@
       <button class="photo-tab" onclick="switchPhotoTab('body', this)">体型・スタイル</button>
       <button class="photo-tab" onclick="switchPhotoTab('coord', this)">コーデ</button>
     </div>
-    <div class="photo-upload-area" onclick="document.getElementById('photo-file-input').click()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      <p>写真をアップロード</p>
-      <span>タップして選択、またはドラッグ&ドロップ</span>
-    </div>
-    <input type="file" id="photo-file-input" accept="image/*" onchange="handlePhotoUpload(event)">
-    <div id="photo-preview-area" style="display:none;">
-      <div class="photo-preview">
-        <img id="preview-img" src="" alt="プレビュー">
+    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+      <div class="photo-upload-area" style="flex: 1; margin-bottom: 0; padding: 20px;" onclick="document.getElementById('photo-file-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <p>現状の写真</p>
       </div>
-      <button class="analyze-btn" onclick="analyzePhoto()" id="analyze-btn">✨ AIで分析する</button>
-      <div id="analysis-result" class="analysis-result" style="display:none;"></div>
+      <div class="photo-upload-area" style="flex: 1; margin-bottom: 0; padding: 20px;" onclick="document.getElementById('goal-file-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <p>目標の写真(任意)</p>
+      </div>
     </div>
+    <input type="file" id="photo-file-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event, 'current')">
+    <input type="file" id="goal-file-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event, 'goal')">
+    
+    <div id="photo-preview-area" style="display:none; gap: 10px; margin-bottom: 16px;">
+      <div class="photo-preview" style="flex: 1; margin-bottom: 0;">
+        <span style="position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.6); color:white; padding:2px 8px; border-radius:10px; font-size:10px; z-index:1;">現状</span>
+        <img id="preview-img" src="" alt="現状">
+      </div>
+      <div class="photo-preview" id="goal-preview-container" style="flex: 1; margin-bottom: 0; display:none;">
+        <span style="position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.6); color:white; padding:2px 8px; border-radius:10px; font-size:10px; z-index:1;">目標</span>
+        <img id="goal-preview-img" src="" alt="目標">
+      </div>
+    </div>
+    <button class="analyze-btn" onclick="analyzePhoto()" id="analyze-btn" style="display:none;">✨ AIで分析・比較する</button>
+    <div id="analysis-result" class="analysis-result" style="display:none;"></div>
     <div id="photo-history-section">
       <h3 style="font-size:13px; color:var(--muted); margin-bottom:10px;">過去の記録</h3>
       <div class="photo-history" id="photo-history-grid">
@@ -429,8 +441,6 @@ async function sendChat() {
 
   addBubble(text, 'user');
 
-  chatHistory.push({ role: 'user', content: text });
-
   const typing = addTyping();
 
   try {
@@ -438,48 +448,51 @@ async function sendChat() {
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }]
     }));
+    geminiMsgs.push({ role: 'user', parts: [{ text: text }] });
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
           contents: geminiMsgs
         })
       }
     );
 
-    // ✅ ここが「4の正しい場所」
+    const data = await res.json();
+
     if (!res.ok) {
       typing.remove();
-      addBubble('⚠️ サーバーエラーが発生しました', 'ai');
+      const errMsg = data.error ? data.error.message : '不明なエラー';
+      addBubble(`⚠️ エラーが発生しました (HTTP ${res.status}): ${errMsg}`, 'ai');
       return;
     }
 
-    const data = await res.json();
-
     typing.remove();
 
-    const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!reply) {
       addBubble('⚠️ 返答が取得できませんでした', 'ai');
       return;
     }
 
-    chatHistory.push({
-      role: 'assistant',
-      content: reply
-    });
+    chatHistory.push({ role: 'user', content: text });
+    chatHistory.push({ role: 'assistant', content: reply });
+    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 
     renderAIBubble(reply);
 
   } catch (e) {
     console.error(e);
     typing?.remove?.();
-    addBubble('⚠️ 通信エラーが発生しました', 'ai');
+    addBubble('⚠️ 通信エラーが発生しました。ネットワーク接続を確認してください。', 'ai');
 
   } finally {
     isSending = false;
@@ -532,6 +545,26 @@ function renderAIBubble(text) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+function handlePhotoUpload(event, type) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    document.getElementById('photo-preview-area').style.display = 'flex';
+    document.getElementById('analyze-btn').style.display = 'block';
+
+    if (type === 'current') {
+      document.getElementById('preview-img').src = dataUrl;
+    } else if (type === 'goal') {
+      document.getElementById('goal-preview-img').src = dataUrl;
+      document.getElementById('goal-preview-container').style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function analyzePhoto() {
   const apiKey = getApiKey();
 
@@ -540,10 +573,11 @@ async function analyzePhoto() {
     return;
   }
 
-  const img = document.getElementById('preview-img').src;
+  const currentImgSrc = document.getElementById('preview-img').src;
+  const goalImgSrc = document.getElementById('goal-preview-img').src;
 
-  if (!img) {
-    alert('画像を選択してください');
+  if (!currentImgSrc || !currentImgSrc.includes(',')) {
+    alert('現状の画像を選択してください');
     return;
   }
 
@@ -553,37 +587,41 @@ async function analyzePhoto() {
   btn.textContent = '分析中...';
 
   try {
-    if (!img.includes(',')) {
-      alert('画像形式が不正です');
-      btn.disabled = false;
-      btn.textContent = '✨ AIで分析する';
-      return;
+    const currentBase64 = currentImgSrc.split(',')[1];
+    const currentMimeType = currentImgSrc.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+    
+    let parts = [
+      {
+        inline_data: { mime_type: currentMimeType, data: currentBase64 }
+      }
+    ];
+
+    let promptText = 'この現状の写真について、外見磨き（メイク・スキンケア・体型・コーデ等）の観点から改善点を教えてください。';
+
+    if (goalImgSrc && goalImgSrc.includes(',')) {
+      const goalBase64 = goalImgSrc.split(',')[1];
+      const goalMimeType = goalImgSrc.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      
+      parts.push({
+        inline_data: { mime_type: goalMimeType, data: goalBase64 }
+      });
+      promptText = '1枚目が「現状の写真」、2枚目が「目標の写真」です。現状が目標からどう離れているか、目標に近づくためには具体的にどうすればいいか、具体的なステップをアドバイスしてください。';
     }
 
-    const base64 = img.split(',')[1];
-    const mimeType = img.startsWith('data:image/png')
-      ? 'image/png'
-      : 'image/jpeg';
+    parts.push({ text: promptText });
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
           contents: [{
             role: 'user',
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64
-                }
-              },
-              {
-                text: 'この画像について改善点を教えてください'
-              }
-            ]
+            parts: parts
           }]
         })
       }
@@ -591,36 +629,34 @@ async function analyzePhoto() {
 
     const data = await res.json();
 
-    if (data.error) {
-      console.log(data.error);
-      alert('画像分析に失敗しました');
+    if (!res.ok) {
+      const errMsg = data.error ? data.error.message : '不明なエラー';
+      alert(`画像分析に失敗しました: ${errMsg}`);
+      btn.disabled = false;
+      btn.textContent = '✨ AIで分析・比較する';
       return;
     }
 
-    const result =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const result = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!result) {
       alert('AIの返答が取得できませんでした');
+      btn.disabled = false;
+      btn.textContent = '✨ AIで分析・比較する';
       return;
     }
 
-    const resultBox =
-      document.getElementById('analysis-result');
-
+    const resultBox = document.getElementById('analysis-result');
     resultBox.style.display = 'block';
-
-    resultBox.innerHTML =
-      `<h4>✨ AI分析結果</h4>${result.replace(/\n/g, '<br>')}`;
+    resultBox.innerHTML = `<h4>✨ AI分析・比較結果</h4>${result.replace(/\n/g, '<br>')}`;
 
     btn.textContent = '✅ 分析完了';
 
   } catch (e) {
     console.error(e);
-    alert('エラーが発生しました');
-
-  } finally {
+    alert('通信エラーが発生しました');
     btn.disabled = false;
+    btn.textContent = '✨ AIで分析・比較する';
   }
 }
 
